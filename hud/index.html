@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>V.A.U.L.T.</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%97%88%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/hud/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="glyph" id="logo-glyph">◈</span>
+      <div>
+        <h1 id="brand-name">V.A.U.L.T.</h1>
+        <p id="brand-tagline" class="dim">Voice-Activated Unified Logic Terminal</p>
+      </div>
+    </div>
+    <div class="brain" id="brain-pill" title="local model status">
+      <span class="dot" id="brain-dot"></span>
+      <span id="brain-label">brain: checking…</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- left: voice + conversation -->
+    <section class="col voice-col">
+      <div class="panel orb-panel">
+        <div class="orb" id="orb"><div class="orb-core"></div></div>
+        <p class="orb-state" id="orb-state">IDLE</p>
+        <p class="dim wake-hint" id="wake-hint">say “jarvis …” or type below</p>
+      </div>
+
+      <div class="panel feed-panel">
+        <h2>// transcript</h2>
+        <div class="feed" id="feed" aria-live="polite"></div>
+        <form id="command-form">
+          <input id="command-input" type="text" autocomplete="off"
+                 placeholder="type a command… (e.g. “note buy SSD” or “write a hook about AI tools”)">
+          <label class="speak-toggle"><input type="checkbox" id="speak-toggle"> 🔊</label>
+        </form>
+      </div>
+    </section>
+
+    <!-- right: metrics + skills + schedule -->
+    <section class="col side-col">
+      <div class="tiles">
+        <div class="panel tile">
+          <p class="tile-label">CPU</p>
+          <p class="tile-value"><span id="m-cpu">–</span><span class="unit">%</span></p>
+          <div class="meter"><div class="meter-fill" id="meter-cpu"></div></div>
+        </div>
+        <div class="panel tile">
+          <p class="tile-label">RAM</p>
+          <p class="tile-value"><span id="m-ram">–</span><span class="unit">%</span></p>
+          <div class="meter"><div class="meter-fill" id="meter-ram"></div></div>
+        </div>
+        <div class="panel tile">
+          <p class="tile-label">MEMORY NOTES</p>
+          <p class="tile-value" id="m-notes">–</p>
+          <p class="tile-sub dim"><span id="m-links">–</span> [[links]]</p>
+        </div>
+        <div class="panel tile">
+          <p class="tile-label">UPTIME</p>
+          <p class="tile-value" id="m-uptime">–</p>
+          <p class="tile-sub dim" id="m-host"></p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>// skills loaded</h2>
+        <div class="skills" id="skills"></div>
+      </div>
+
+      <div class="panel">
+        <h2>// schedule</h2>
+        <ul class="schedule" id="schedule"><li class="dim">vault/Schedule.md is empty</li></ul>
+      </div>
+    </section>
+  </main>
+
+<script src="/hud/app.js"></script>
+</body>
+</html>

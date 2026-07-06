@@ -1,0 +1,50 @@
+{
+  "assistant": {
+    "name": "JARVIS",
+    "tagline": "Voice-Activated Unified Logic Terminal",
+    "wake_word": "jarvis",
+    "language": "auto"
+  },
+  "llm": {
+    "provider": "ollama",
+    "host": "http://127.0.0.1:11434",
+    "model": "qwen2.5:1.5b",
+    "temperature": 0.4,
+    "max_tokens": 1024
+  },
+  "voice": {
+    "tts_engine": "say",
+    "say_voice": "",
+    "kokoro_voice": "af_heart",
+    "stt_model": "tiny",
+    "stt_compute": "int8",
+    "mic_enabled": true,
+    "vad_threshold": 0.015,
+    "utterance_silence_sec": 0.9,
+    "max_utterance_sec": 20
+  },
+  "vault": {
+    "path": "vault",
+    "session_folder": "20_Sessions",
+    "report_folder": "10_Reports",
+    "inbox_folder": "00_Inbox"
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8765
+  },
+  "theme": {
+    "brand": "V.A.U.L.T.",
+    "bg": "#0b0e14",
+    "panel": "#11151f",
+    "panel_edge": "#1c2333",
+    "text": "#e6edf7",
+    "text_dim": "#8b96ab",
+    "accent": "#5ee0c2",
+    "accent_2": "#7d86d9",
+    "warn": "#e0a75e",
+    "danger": "#e05e7d",
+    "font": "'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, monospace",
+    "logo_glyph": "◈"
+  }
+}

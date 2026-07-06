@@ -1,0 +1,3 @@
+- 09:00 review inbox notes
+- 14:00 client follow-ups
+- 20:00 content: one short-form script
