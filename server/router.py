@@ -26,11 +26,13 @@ class RouteResult:
 
 
 class Router:
-    def __init__(self, llm: LocalLLM, vault: Vault, skills: list[Skill], assistant_name: str):
+    def __init__(self, llm: LocalLLM, vault: Vault, skills: list[Skill], assistant_name: str,
+                 hermes=None):
         self.llm = llm
         self.vault = vault
         self.skills = skills
         self.assistant_name = assistant_name
+        self.hermes = hermes  # optional HermesAdapter — None on clean installs
 
     # ---------------------------------------------------------------- fast
     _TIME_RE = re.compile(r"\b(time|clock)\b|幾點|几点", re.I)
@@ -72,8 +74,18 @@ class Router:
         return result
 
     def _route(self, text: str) -> RouteResult:
+        # a pending Hermes confirmation outranks everything — "confirm"/"cancel"
+        if self.hermes and self.hermes.pending and (intent := self.hermes.match(text)):
+            result = self.hermes.handle(intent, text)
+            return RouteResult(result.text, "hermes")
+
         if fast := self._fast_path(text):
             return fast
+
+        if self.hermes and (intent := self.hermes.match(text)):
+            result = self.hermes.handle(intent, text)
+            lane = "hermes:pending-confirm" if result.pending else f"hermes:{intent}"
+            return RouteResult(result.text, lane)
 
         if skill := self._match_skill(text):
             system = (

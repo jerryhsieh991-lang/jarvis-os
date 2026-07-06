@@ -45,7 +45,15 @@ llm = LocalLLM(
     CONFIG["llm"].get("temperature", 0.4),
     CONFIG["llm"].get("max_tokens", 1024),
 )
-router = Router(llm, vault, skills, CONFIG["assistant"]["name"])
+_hermes_cfg = CONFIG.get("adapters", {}).get("hermes", {})
+hermes = None
+if _hermes_cfg.get("enabled") in ("auto", True):
+    from .adapters.hermes import HermesAdapter
+    _candidate = HermesAdapter(_hermes_cfg.get("bin_dir", "~/.hermes/bin"), llm)
+    if _candidate.available() or _hermes_cfg.get("enabled") is True:
+        hermes = _candidate
+
+router = Router(llm, vault, skills, CONFIG["assistant"]["name"], hermes=hermes)
 tts = TTS(
     CONFIG["voice"].get("tts_engine", "say"),
     CONFIG["voice"].get("say_voice", ""),
@@ -114,6 +122,7 @@ async def api_state():
     return {
         "assistant": CONFIG["assistant"]["name"],
         "brain": {"model": CONFIG["llm"]["model"], "online": llm.available()},
+        "adapters": {"hermes": bool(hermes and hermes.available())},
         "skills": [{"name": s.name, "description": s.description, "triggers": s.triggers[:6]}
                    for s in skills],
         "memory": mem,

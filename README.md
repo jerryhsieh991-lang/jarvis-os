@@ -70,6 +70,22 @@ assistant name, wake word, brand text, logo glyph, all colors, LLM model. Fork t
 repo, edit one JSON file, and it's a different product. `.env` is optional and
 never required.
 
+## Optional: Hermes hands (real-world reach)
+
+If the machine has a [Hermes](https://github.com/NousResearch) agent stack installed
+(`~/.hermes/bin`), jarvis-os auto-detects it and gains voice-driven reach:
+
+```
+"jarvis, check my email"                → Gmail inbox, latest 5
+"jarvis, search the web for MCP spec"   → live web search, digested by the local brain
+"jarvis, what's on my calendar"         → next events
+"jarvis, send email to a@b.com about…"  → drafts it, then WAITS for "confirm"
+```
+
+Side-effect commands are **always confirmation-gated** — nothing sends until you say
+*confirm*. No Hermes installed? The adapter stays dormant and the OS is unchanged;
+credentials always live inside Hermes, never in this repo.
+
 ## Swap the brain
 
 Any Ollama model works — edit `config.json → llm.model`:

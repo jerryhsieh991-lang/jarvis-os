@@ -33,6 +33,12 @@
     "host": "127.0.0.1",
     "port": 8765
   },
+  "adapters": {
+    "hermes": {
+      "enabled": "auto",
+      "bin_dir": "~/.hermes/bin"
+    }
+  },
   "theme": {
     "brand": "V.A.U.L.T.",
     "bg": "#0b0e14",
