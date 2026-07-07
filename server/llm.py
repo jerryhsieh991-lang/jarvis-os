@@ -22,6 +22,34 @@ class LocalLLM:
         except httpx.HTTPError:
             return False
 
+    def chat_stream(self, prompt: str, system: str = "", timeout: float = 120):
+        """Yield response chunks as Ollama produces them (sync generator)."""
+        import json as _json
+
+        payload = {
+            "model": self.model,
+            "stream": True,
+            "options": {"temperature": self.temperature, "num_predict": self.max_tokens},
+            "messages": ([{"role": "system", "content": system}] if system else [])
+            + [{"role": "user", "content": prompt}],
+        }
+        try:
+            with httpx.stream("POST", f"{self.host}/api/chat", json=payload, timeout=timeout) as r:
+                r.raise_for_status()
+                for line in r.iter_lines():
+                    if not line:
+                        continue
+                    data = _json.loads(line)
+                    if chunk := data.get("message", {}).get("content"):
+                        yield chunk
+                    if data.get("done"):
+                        return
+        except httpx.HTTPError as e:
+            yield (
+                "Brain offline — start it with `ollama serve` and "
+                f"`ollama pull {self.model}`. ({type(e).__name__})"
+            )
+
     def chat(self, prompt: str, system: str = "", timeout: float = 120) -> str:
         payload = {
             "model": self.model,

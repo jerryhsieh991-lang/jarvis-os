@@ -1,14 +1,23 @@
-"""Text-to-speech — two free engines:
+"""Text-to-speech — two free engines, picked per utterance:
 
-- "say"    : macOS built-in. Zero install, works immediately.
-- "kokoro" : open-source neural TTS (optional: pip install kokoro-onnx and
-             download the free model files; see setup.sh --with-kokoro).
+- "kokoro" : open-source neural TTS (models fetched by `setup.sh --with-kokoro`).
+             Used for Latin-script text when available.
+- "say"    : macOS built-in. Zero install, and the fallback for everything —
+             including CJK text, which the bundled Kokoro voices don't cover well.
+
+`speak()` is called per *sentence* by the streaming pipeline, so the first
+words play while the model is still generating the rest.
 """
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import threading
+from pathlib import Path
+
+_CJK_RE = re.compile(r"[一-鿿぀-ヿ가-힯]")
+_MODELS = Path(__file__).resolve().parents[2] / "models"
 
 
 class TTS:
@@ -17,20 +26,29 @@ class TTS:
         self.say_voice = say_voice
         self.kokoro_voice = kokoro_voice
         self._kokoro = None
-        self._lock = threading.Lock()  # one voice at a time
+        self._kokoro_broken = False
+        self._lock = threading.Lock()  # one voice at a time, sentences queue up
 
     def speak(self, text: str) -> None:
         text = text.strip()
         if not text:
             return
         with self._lock:
-            if self.engine == "kokoro":
+            if self._use_kokoro(text):
                 try:
                     self._speak_kokoro(text)
                     return
                 except Exception:
-                    pass  # fall back to say
+                    self._kokoro_broken = True  # don't retry every sentence
             self._speak_say(text)
+
+    def _use_kokoro(self, text: str) -> bool:
+        return (
+            self.engine == "kokoro"
+            and not self._kokoro_broken
+            and not _CJK_RE.search(text)
+            and (_MODELS / "kokoro-v1.0.onnx").exists()
+        )
 
     # -- engines --------------------------------------------------------
     def _speak_say(self, text: str) -> None:
@@ -46,7 +64,7 @@ class TTS:
 
         if self._kokoro is None:
             from kokoro_onnx import Kokoro
-            self._kokoro = Kokoro("models/kokoro-v1.0.onnx", "models/voices-v1.0.bin")
+            self._kokoro = Kokoro(str(_MODELS / "kokoro-v1.0.onnx"), str(_MODELS / "voices-v1.0.bin"))
         samples, sample_rate = self._kokoro.create(text, voice=self.kokoro_voice, speed=1.0)
         sd.play(samples, sample_rate)
         sd.wait()

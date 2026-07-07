@@ -80,6 +80,31 @@ function addMsg(kind, text, lane) {
 }
 
 let ws;
+let liveMsg = null; // the assistant bubble currently being streamed into
+
+function startLiveMsg() {
+  const feed = $("feed");
+  liveMsg = document.createElement("div");
+  liveMsg.className = "msg assistant";
+  feed.appendChild(liveMsg);
+}
+
+function appendLiveMsg(text) {
+  if (!liveMsg) startLiveMsg();
+  liveMsg.textContent += text;
+  const feed = $("feed");
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function endLiveMsg(lane) {
+  if (!liveMsg) return;
+  const tag = document.createElement("span");
+  tag.className = "lane";
+  tag.textContent = `[${lane}]`;
+  liveMsg.appendChild(tag);
+  liveMsg = null;
+}
+
 function connectWS() {
   ws = new WebSocket(`ws://${location.host}/ws`);
   ws.onmessage = (e) => {
@@ -88,6 +113,9 @@ function connectWS() {
     else if (kind === "transcript") addMsg("transcript", `🎙 ${payload.text}`);
     else if (kind === "command") addMsg("user", payload.text);
     else if (kind === "response") addMsg("assistant", payload.text, payload.lane + (payload.saved_to ? " → vault" : ""));
+    else if (kind === "response_start") startLiveMsg();
+    else if (kind === "response_chunk") appendLiveMsg(payload.text);
+    else if (kind === "response_done") endLiveMsg(payload.lane + (payload.saved_to ? " → vault" : ""));
     else if (kind === "wake") addMsg("transcript", "🟢 wake word — listening for command");
     else if (kind === "voice_error") addMsg("transcript", `⚠ mic unavailable: ${payload.detail} (text input still works)`);
   };

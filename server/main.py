@@ -9,6 +9,7 @@ import asyncio
 import json
 import os
 import platform
+import re
 import time
 from pathlib import Path
 
@@ -88,16 +89,71 @@ class Bus:
 bus = Bus()
 
 
+_SENTENCE_END = re.compile(r"[.!?。！？;；\n]")
+
+
 async def run_command(text: str, speak: bool = True) -> dict:
     await bus.emit("command", {"text": text})
     await bus.emit("voice_state", {"state": "thinking"})
-    result = await asyncio.to_thread(router.handle, text)
-    await bus.emit("response", {"text": result.text, "lane": result.lane, "saved_to": result.saved_to})
-    if speak:
-        await bus.emit("voice_state", {"state": "speaking"})
-        await asyncio.to_thread(tts.speak, result.text)
+    result = await asyncio.to_thread(router.handle_start, text)
+
+    # non-streaming lanes (fast / hermes) — answer is already complete
+    if result.stream is None:
+        await bus.emit("response", {"text": result.text, "lane": result.lane, "saved_to": result.saved_to})
+        if speak:
+            await bus.emit("voice_state", {"state": "speaking"})
+            await asyncio.to_thread(tts.speak, result.text)
+        await bus.emit("voice_state", {"state": "idle"})
+        return {"text": result.text, "lane": result.lane, "saved_to": result.saved_to}
+
+    # streaming lanes (skill / chat): speak sentence N while N+1 generates
+    await bus.emit("response_start", {"lane": result.lane})
+    loop = asyncio.get_running_loop()
+    chunks: asyncio.Queue = asyncio.Queue()
+
+    def _pump(stream=result.stream):
+        try:
+            for piece in stream:
+                loop.call_soon_threadsafe(chunks.put_nowait, piece)
+        finally:
+            loop.call_soon_threadsafe(chunks.put_nowait, None)
+
+    pump = loop.run_in_executor(None, _pump)
+
+    sentences: asyncio.Queue = asyncio.Queue()
+
+    async def _speaker():
+        first = True
+        while (s := await sentences.get()) is not None:
+            if first:
+                await bus.emit("voice_state", {"state": "speaking"})
+                first = False
+            await asyncio.to_thread(tts.speak, s)
+
+    speaker = asyncio.create_task(_speaker()) if speak else None
+
+    parts: list[str] = []
+    buf = ""
+    while (piece := await chunks.get()) is not None:
+        parts.append(piece)
+        buf += piece
+        await bus.emit("response_chunk", {"text": piece})
+        while (m := _SENTENCE_END.search(buf, 10)) is not None:  # min 10 chars per utterance
+            sentence, buf = buf[: m.end()], buf[m.end():]
+            if speak and sentence.strip():
+                sentences.put_nowait(sentence)
+    await pump
+    if speaker:
+        if buf.strip():
+            sentences.put_nowait(buf)
+        sentences.put_nowait(None)
+        await speaker
+
+    full_text = "".join(parts)
+    result = await asyncio.to_thread(router.complete, result, full_text)
+    await bus.emit("response_done", {"text": full_text, "lane": result.lane, "saved_to": result.saved_to})
     await bus.emit("voice_state", {"state": "idle"})
-    return {"text": result.text, "lane": result.lane, "saved_to": result.saved_to}
+    return {"text": full_text, "lane": result.lane, "saved_to": result.saved_to}
 
 
 # ---------------------------------------------------------------- routes

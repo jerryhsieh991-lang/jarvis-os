@@ -43,6 +43,10 @@ Say **"jarvis, what time is it"** — or type into the HUD's command box (works 
                                                    ▼
                                     reply ──► TTS speaks ──► HUD updates
                                        └──► vault/ (session log + reports, [[linked]])
+
+LLM lanes stream: the reply is spoken **sentence by sentence while it's still
+generating** — first words in ~2 s. English speaks through Kokoro's neural voice
+when installed (`./setup.sh --with-kokoro`); CJK text and clean installs use `say`.
 ```
 
 ## The five layers, hands-on

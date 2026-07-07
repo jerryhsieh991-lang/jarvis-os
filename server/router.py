@@ -11,7 +11,8 @@ from __future__ import annotations
 import datetime as _dt
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Callable, Iterator
 
 from .llm import LocalLLM
 from .memory import Vault
@@ -20,9 +21,12 @@ from .skills_loader import Skill
 
 @dataclass
 class RouteResult:
-    text: str
-    lane: str            # "fast" | "skill:<name>" | "chat"
+    text: str = ""
+    lane: str = ""       # "fast" | "hermes:*" | "skill:<name>" | "chat"
     saved_to: str | None = None
+    # streaming lanes: consume `stream`, then call Router.complete(result, full)
+    stream: Iterator[str] | None = field(default=None, repr=False)
+    finalize: Callable[[str], str | None] | None = field(default=None, repr=False)
 
 
 class Router:
@@ -67,10 +71,31 @@ class Router:
         return None
 
     # ---------------------------------------------------------------- main
-    def handle(self, text: str) -> RouteResult:
+    def handle_start(self, text: str) -> RouteResult:
+        """Route a command. If the result carries a stream, the caller must
+        consume it and then call `complete()`."""
         self.vault.append_session("user", text)
         result = self._route(text)
-        self.vault.append_session(self.assistant_name, result.text)
+        if result.stream is None:
+            self.vault.append_session(self.assistant_name, result.text)
+        return result
+
+    def complete(self, result: RouteResult, full_text: str) -> RouteResult:
+        """Finish a streamed result: vault-save + session log."""
+        result.text = full_text
+        if result.finalize:
+            result.saved_to = result.finalize(full_text)
+        self.vault.append_session(self.assistant_name, full_text)
+        return result
+
+    def handle(self, text: str) -> RouteResult:
+        """Synchronous convenience: routes and, for streaming lanes, blocks
+        until the full answer is assembled."""
+        result = self.handle_start(text)
+        if result.stream is not None:
+            full = "".join(result.stream)
+            result.stream = None
+            result = self.complete(result, full)
         return result
 
     def _route(self, text: str) -> RouteResult:
@@ -92,15 +117,21 @@ class Router:
                 f"You are {self.assistant_name}, a local voice OS. "
                 f"Load and obey this skill exactly:\n\n{skill.body}"
             )
-            answer = self.llm.chat(text, system=system)
-            saved = None
-            if len(answer) > 400:  # substantial outputs become vault reports
-                path = self.vault.write_report(
-                    f"{skill.name} — {text[:40]}", answer,
-                    links=[skill.name.replace("_", " ").title()],
-                )
-                saved = str(path)
-            return RouteResult(answer, f"skill:{skill.name}", saved_to=saved)
+
+            def _save(answer: str, _skill=skill, _text=text) -> str | None:
+                if len(answer) > 400:  # substantial outputs become vault reports
+                    path = self.vault.write_report(
+                        f"{_skill.name} — {_text[:40]}", answer,
+                        links=[_skill.name.replace("_", " ").title()],
+                    )
+                    return str(path)
+                return None
+
+            return RouteResult(
+                lane=f"skill:{skill.name}",
+                stream=self.llm.chat_stream(text, system=system),
+                finalize=_save,
+            )
 
         # general chat — give the model a peek at relevant memory
         context = ""
@@ -113,4 +144,4 @@ class Router:
             "Answer in the user's language. Two sentences unless asked for more."
             f"{context}"
         )
-        return RouteResult(self.llm.chat(text, system=system), "chat")
+        return RouteResult(lane="chat", stream=self.llm.chat_stream(text, system=system))
